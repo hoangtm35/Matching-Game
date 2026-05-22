@@ -34,7 +34,15 @@ Left sidebar → **Table Editor**. You should see:
 2. Copy all of `002_seed.sql`
 3. Paste and **Run**
 
-### 4. Add game timer column (if project already exists)
+### 4. Add lobbies (required for multiplayer)
+
+Run `004_lobbies.sql` once in SQL Editor. Also run `003_add_time_seconds.sql` first if you have not already.
+
+### 5. Lobby timer + session results (no scores table)
+
+Run `005_lobby_timer_results.sql` — 5-minute lobby timer; results shown once when time ends (stored temporarily on the lobby row, not in `scores`).
+
+### 5. Add game timer column (if project already exists)
 
 If you created the database before the timer feature, run `003_add_time_seconds.sql` once in SQL Editor.
 

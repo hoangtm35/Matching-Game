@@ -8,12 +8,14 @@ Single-player web game: match items from section A to section B, submit your sco
 - Questions: **random** from a pool
 - Interaction: **click A**, then **click B**
 
-## Play the game
+## Play the game (lobby mode)
 
 1. `npm run dev` → [http://localhost:3000](http://localhost:3000)
-2. Enter your name → **Start game**
-3. Click an item in **Section A**, then its match in **Section B**
-4. **Finish** when all pairs are matched — score saves to the top 10 leaderboard
+2. **Create a lobby** (you get a 6-letter code) or **Join** with a friend’s code
+3. In the lobby, share the code — others join from the home page
+4. Each player clicks **Play game**, matches A → B, finishes the round
+5. Play before the **5-minute timer** ends — your score is held for that session only
+6. When time hits **0:00**, the **leaderboard appears once** (not saved to a permanent scores table)
 
 ## Step 2 — Database (done)
 

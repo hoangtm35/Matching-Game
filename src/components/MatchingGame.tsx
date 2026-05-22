@@ -2,7 +2,12 @@
 
 import { MatchOptionRow } from "@/components/MatchOptionRow";
 import { formatTime } from "@/lib/game/format-time";
-import { fetchRandomQuestionSet, submitScore } from "@/lib/game/queries";
+import {
+  fetchLobbyByCode,
+  hasPlayerFinished,
+  submitLobbyResult,
+} from "@/lib/game/lobby-queries";
+import { fetchRandomQuestionSet } from "@/lib/game/queries";
 import { getPlayerName } from "@/lib/game/player";
 import type { GameRound, Option } from "@/types/game";
 import Link from "next/link";
@@ -14,8 +19,14 @@ type Phase = "loading" | "playing" | "submitting" | "done";
 const FADE_MS = 900;
 const SHAKE_MS = 450;
 
-export function MatchingGame() {
+type MatchingGameProps = {
+  lobbyId: string;
+  lobbyCode: string;
+};
+
+export function MatchingGame({ lobbyId, lobbyCode }: MatchingGameProps) {
   const router = useRouter();
+  const lobbyHref = `/lobby/${lobbyCode}`;
   const [phase, setPhase] = useState<Phase>("loading");
   const [playerName, setPlayerNameState] = useState<string | null>(null);
   const [round, setRound] = useState<GameRound | null>(null);
@@ -113,8 +124,8 @@ export function MatchingGame() {
     async (
       score: number,
       totalPairs: number,
-      questionSetId: string,
       timeSeconds: number,
+      questionSetTitle: string,
     ) => {
       if (!playerName || finishStarted.current) return;
       finishStarted.current = true;
@@ -122,33 +133,44 @@ export function MatchingGame() {
       setPhase("submitting");
 
       try {
-        await submitScore({
-          playerName,
+        await submitLobbyResult(lobbyId, {
+          player_name: playerName,
           score,
-          totalPairs,
-          questionSetId,
-          timeSeconds,
+          total_pairs: totalPairs,
+          time_seconds: timeSeconds,
+          question_set_title: questionSetTitle,
         });
         setPhase("done");
       } catch {
         setSubmitError(
-          "Score could not be saved. Try again from the home page.",
+          "Could not record your score. The lobby may have ended.",
         );
         setPhase("done");
       }
     },
-    [playerName],
+    [playerName, lobbyId],
   );
 
   useEffect(() => {
-    const name = getPlayerName();
-    if (!name) {
-      router.replace("/");
-      return;
+    async function init() {
+      const name = getPlayerName();
+      if (!name) {
+        router.replace("/");
+        return;
+      }
+
+      const lobby = await fetchLobbyByCode(lobbyCode);
+      if (lobby && hasPlayerFinished(lobby.results, name)) {
+        router.replace(lobbyHref);
+        return;
+      }
+
+      setPlayerNameState(name);
+      loadRound();
     }
-    setPlayerNameState(name);
-    loadRound();
-  }, [router, loadRound]);
+
+    void init();
+  }, [router, loadRound, lobbyCode, lobbyHref]);
 
   useEffect(() => {
     if (!round || phase !== "playing") return;
@@ -160,8 +182,8 @@ export function MatchingGame() {
       finishRound(
         correctCount,
         round.optionsA.length,
-        round.questionSet.id,
         timeSeconds,
+        round.questionSet.title,
       );
     }, FADE_MS);
   }, [correctCount, round, phase, finishRound, schedule, getElapsedSeconds]);
@@ -215,8 +237,8 @@ export function MatchingGame() {
     return (
       <div className="mx-auto max-w-md space-y-4 px-4 py-16 text-center">
         <p className="text-red-400">{error}</p>
-        <Link href="/" className="text-sky-400 hover:underline">
-          Back to home
+        <Link href={lobbyHref} className="text-sky-400 hover:underline">
+          Back to lobby
         </Link>
       </div>
     );
@@ -243,25 +265,20 @@ export function MatchingGame() {
             <p className="mt-4 text-sm text-amber-400">{submitError}</p>
           ) : (
             <p className="mt-4 text-sm text-emerald-400">
-              Score saved to the leaderboard!
+              Score recorded! Leaderboard shows when everyone finishes or time
+              runs out.
             </p>
           )}
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            onClick={loadRound}
-            className="flex-1 rounded-lg bg-sky-600 py-3 font-medium text-white hover:bg-sky-500"
-          >
-            Play again
-          </button>
-          <Link
-            href="/"
-            className="flex flex-1 items-center justify-center rounded-lg border border-zinc-700 py-3 font-medium text-zinc-200 hover:bg-zinc-800"
-          >
-            Leaderboard
-          </Link>
-        </div>
+        <Link
+          href={lobbyHref}
+          className="block rounded-lg bg-sky-600 py-3 text-center font-medium text-white transition-colors hover:bg-sky-500"
+        >
+          Back to lobby
+        </Link>
+        <p className="text-center text-xs text-zinc-500">
+          You can only play once per lobby.
+        </p>
       </div>
     );
   }
@@ -397,8 +414,8 @@ export function MatchingGame() {
       )}
 
       <div className="mt-10 text-center">
-        <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-300">
-          Exit to home
+        <Link href={lobbyHref} className="text-sm text-zinc-500 hover:text-zinc-300">
+          Back to lobby
         </Link>
       </div>
     </div>

@@ -13,14 +13,32 @@ export type Option = {
   sort_order: number;
 };
 
-export type Score = {
-  id: string;
+export type LobbyStatus = "waiting" | "playing" | "ended";
+
+export type LobbyResult = {
   player_name: string;
   score: number;
   total_pairs: number;
-  question_set_id: string | null;
-  time_seconds: number | null;
-  played_at: string;
+  time_seconds: number;
+  question_set_title: string;
+  finished_at: string;
+};
+
+export type Lobby = {
+  id: string;
+  code: string;
+  host_name: string;
+  created_at: string;
+  ends_at: string | null;
+  status: LobbyStatus;
+  results: LobbyResult[];
+};
+
+export type LobbyPlayer = {
+  id: string;
+  lobby_id: string;
+  player_name: string;
+  joined_at: string;
 };
 
 export type GameRound = {

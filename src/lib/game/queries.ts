@@ -1,7 +1,5 @@
 import { tryCreateClient } from "@/lib/supabase/client";
-import type { GameRound, Option, QuestionSet, Score } from "@/types/game";
-
-const LEADERBOARD_LIMIT = 10;
+import type { GameRound, Option, QuestionSet } from "@/types/game";
 
 export async function fetchRandomQuestionSet(): Promise<GameRound | null> {
   const supabase = tryCreateClient();
@@ -35,55 +33,6 @@ export async function fetchRandomQuestionSet(): Promise<GameRound | null> {
   const optionsB = shuffle(all.filter((o) => o.side === "B"));
 
   return { questionSet, optionsA, optionsB };
-}
-
-export async function fetchLeaderboard(): Promise<Score[]> {
-  const supabase = tryCreateClient();
-  if (!supabase) return [];
-
-  const { data, error } = await supabase
-    .from("scores")
-    .select(
-      "id, player_name, score, total_pairs, question_set_id, time_seconds, played_at",
-    )
-    .order("score", { ascending: false })
-    .order("played_at", { ascending: true })
-    .limit(LEADERBOARD_LIMIT);
-
-  if (error) throw error;
-  return (data ?? []) as Score[];
-}
-
-export async function submitScore(input: {
-  playerName: string;
-  score: number;
-  totalPairs: number;
-  questionSetId: string;
-  timeSeconds: number;
-}): Promise<Score> {
-  const supabase = tryCreateClient();
-  if (!supabase) {
-    throw new Error(
-      "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-    );
-  }
-
-  const { data, error } = await supabase
-    .from("scores")
-    .insert({
-      player_name: input.playerName.trim(),
-      score: input.score,
-      total_pairs: input.totalPairs,
-      question_set_id: input.questionSetId,
-      time_seconds: input.timeSeconds,
-    })
-    .select(
-      "id, player_name, score, total_pairs, question_set_id, time_seconds, played_at",
-    )
-    .single();
-
-  if (error) throw error;
-  return data as Score;
 }
 
 function shuffle<T>(items: T[]): T[] {
