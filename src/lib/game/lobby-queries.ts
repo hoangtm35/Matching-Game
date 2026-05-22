@@ -16,33 +16,47 @@ function requireClient() {
   return supabase;
 }
 
-function parseResults(raw: unknown): LobbyResult[] {
-  if (!Array.isArray(raw)) return [];
-  return raw as LobbyResult[];
-}
-
 function sortResults(results: LobbyResult[]): LobbyResult[] {
   return [...results]
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      return (a.time_seconds ?? 999) - (b.time_seconds ?? 999);
+      return a.time_seconds - a.time_seconds;
     })
     .slice(0, TOP_RESULTS);
 }
 
-function mapLobby(data: {
+type LobbyRow = {
   id: string;
   code: string;
   host_name: string;
   created_at: string;
   ends_at: string | null;
   status: Lobby["status"];
-  results: unknown;
-}): Lobby {
-  return {
-    ...data,
-    results: parseResults(data.results),
-  };
+};
+
+async function attachResults(
+  row: LobbyRow,
+  results?: LobbyResult[],
+): Promise<Lobby> {
+  const list = results ?? (await fetchLobbyResults(row.id));
+  return { ...row, results: list };
+}
+
+export async function fetchLobbyResults(lobbyId: string): Promise<LobbyResult[]> {
+  const supabase = tryCreateClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("lobby_results")
+    .select(
+      "id, player_name, score, total_pairs, time_seconds, question_set_title, finished_at",
+    )
+    .eq("lobby_id", lobbyId)
+    .order("score", { ascending: false })
+    .order("time_seconds", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as LobbyResult[];
 }
 
 export function allPlayersFinished(
@@ -82,11 +96,8 @@ export async function createLobby(hostName: string): Promise<Lobby> {
         host_name: trimmed,
         ends_at: null,
         status: "waiting",
-        results: [],
       })
-      .select(
-        "id, code, host_name, created_at, ends_at, status, results",
-      )
+      .select("id, code, host_name, created_at, ends_at, status")
       .single();
 
     if (!error && data) {
@@ -94,7 +105,7 @@ export async function createLobby(hostName: string): Promise<Lobby> {
         lobby_id: data.id,
         player_name: trimmed,
       });
-      return mapLobby(data);
+      return attachResults(data as LobbyRow);
     }
 
     if (error?.code !== "23505") throw error;
@@ -107,7 +118,6 @@ export async function joinLobby(
   codeInput: string,
   playerName: string,
 ): Promise<Lobby> {
-  const supabase = requireClient();
   const code = normalizeLobbyCode(codeInput);
   const trimmed = playerName.trim();
 
@@ -128,6 +138,7 @@ export async function joinLobby(
     throw new Error("The game already started. You cannot join now.");
   }
 
+  const supabase = requireClient();
   const { error: playerError } = await supabase.from("lobby_players").upsert(
     { lobby_id: lobby.id, player_name: trimmed },
     { onConflict: "lobby_id,player_name" },
@@ -138,7 +149,6 @@ export async function joinLobby(
   return lobby;
 }
 
-/** Host starts the round — timer begins and players can play. */
 export async function startLobby(
   lobbyId: string,
   hostName: string,
@@ -162,19 +172,21 @@ export async function startLobby(
     throw new Error("The game has already started or ended.");
   }
 
+  await supabase.from("lobby_results").delete().eq("lobby_id", lobbyId);
+
   const endsAt = new Date(
     Date.now() + DEFAULT_LOBBY_DURATION_SEC * 1000,
   ).toISOString();
 
   const { data, error } = await supabase
     .from("lobbies")
-    .update({ status: "playing", ends_at: endsAt, results: [] })
+    .update({ status: "playing", ends_at: endsAt })
     .eq("id", lobbyId)
-    .select("id, code, host_name, created_at, ends_at, status, results")
+    .select("id, code, host_name, created_at, ends_at, status")
     .single();
 
   if (error) throw error;
-  return mapLobby(data);
+  return attachResults(data as LobbyRow, []);
 }
 
 export async function fetchLobbyByCode(codeInput: string): Promise<Lobby | null> {
@@ -186,13 +198,13 @@ export async function fetchLobbyByCode(codeInput: string): Promise<Lobby | null>
 
   const { data, error } = await supabase
     .from("lobbies")
-    .select("id, code, host_name, created_at, ends_at, status, results")
+    .select("id, code, host_name, created_at, ends_at, status")
     .eq("code", code)
     .single();
 
   if (error || !data) return null;
 
-  return mapLobby(data);
+  return attachResults(data as LobbyRow);
 }
 
 export async function fetchLobbyPlayers(
@@ -217,40 +229,48 @@ export async function endLobby(lobbyId: string): Promise<Lobby> {
     .from("lobbies")
     .update({ status: "ended" })
     .eq("id", lobbyId)
-    .select("id, code, host_name, created_at, ends_at, status, results")
+    .select("id, code, host_name, created_at, ends_at, status")
     .single();
 
   if (error) throw error;
-  return mapLobby(data);
+  return attachResults(data as LobbyRow);
 }
 
 export async function syncLobbyState(lobby: Lobby): Promise<Lobby> {
-  if (lobby.status === "ended") return lobby;
+  if (lobby.status === "ended") {
+    const results = await fetchLobbyResults(lobby.id);
+    return { ...lobby, results };
+  }
 
   if (lobby.status === "playing") {
-    if (isLobbyExpired(lobby)) {
+    const results = await fetchLobbyResults(lobby.id);
+    const withResults = { ...lobby, results };
+
+    if (isLobbyExpired(withResults)) {
       return endLobby(lobby.id);
     }
 
     const players = await fetchLobbyPlayers(lobby.id);
-    if (allPlayersFinished(players, lobby.results)) {
+    if (allPlayersFinished(players, results)) {
       return endLobby(lobby.id);
     }
+
+    return withResults;
   }
 
-  return lobby;
+  const results = await fetchLobbyResults(lobby.id);
+  return { ...lobby, results };
 }
 
-/** Record a finish in the lobby session (temporary — not the scores table). */
 export async function submitLobbyResult(
   lobbyId: string,
-  result: Omit<LobbyResult, "finished_at">,
+  result: Omit<LobbyResult, "finished_at" | "id">,
 ): Promise<void> {
   const supabase = requireClient();
 
   const { data: lobby, error: fetchError } = await supabase
     .from("lobbies")
-    .select("ends_at, status, results")
+    .select("ends_at, status")
     .eq("id", lobbyId)
     .single();
 
@@ -264,26 +284,28 @@ export async function submitLobbyResult(
     throw new Error("Lobby time has ended.");
   }
 
-  const entry: LobbyResult = {
-    ...result,
-    finished_at: new Date().toISOString(),
-  };
+  const { error: insertError } = await supabase.from("lobby_results").insert({
+    lobby_id: lobbyId,
+    player_name: result.player_name.trim(),
+    score: result.score,
+    total_pairs: result.total_pairs,
+    time_seconds: result.time_seconds,
+    question_set_title: result.question_set_title,
+  });
 
-  const existing = parseResults(lobby.results);
-  if (hasPlayerFinished(existing, result.player_name)) {
-    throw new Error("You already played in this lobby.");
+  if (insertError) {
+    if (insertError.code === "23505") {
+      throw new Error("You already played in this lobby.");
+    }
+    throw insertError;
   }
-  const updated = sortResults([...existing, entry]);
 
-  const { error: updateError } = await supabase
-    .from("lobbies")
-    .update({ results: updated })
-    .eq("id", lobbyId);
+  const [players, results] = await Promise.all([
+    fetchLobbyPlayers(lobbyId),
+    fetchLobbyResults(lobbyId),
+  ]);
 
-  if (updateError) throw updateError;
-
-  const players = await fetchLobbyPlayers(lobbyId);
-  if (allPlayersFinished(players, updated)) {
+  if (allPlayersFinished(players, results)) {
     await endLobby(lobbyId);
   }
 }

@@ -16,6 +16,7 @@ export type Option = {
 export type LobbyStatus = "waiting" | "playing" | "ended";
 
 export type LobbyResult = {
+  id?: string;
   player_name: string;
   score: number;
   total_pairs: number;

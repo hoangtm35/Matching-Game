@@ -4,25 +4,23 @@ import { LobbyResults } from "@/components/LobbyResults";
 import {
   allPlayersFinished,
   countFinishedPlayers,
-  fetchLobbyByCode,
   hasPlayerFinished,
-  fetchLobbyPlayers,
   isLobbyEnded,
   isLobbyExpired,
   isLobbyPlaying,
   startLobby,
-  syncLobbyState,
 } from "@/lib/game/lobby-queries";
+import { useLobbyLive } from "@/lib/game/use-lobby-live";
 import { formatTime } from "@/lib/game/format-time";
 import {
   clearLobbySession,
   getPlayerName,
   setLobbySession,
 } from "@/lib/game/session";
-import type { Lobby, LobbyPlayer } from "@/types/game";
+import type { Lobby } from "@/types/game";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type LobbyRoomProps = {
   initialLobby: Lobby;
@@ -30,8 +28,10 @@ type LobbyRoomProps = {
 
 export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
   const router = useRouter();
-  const [lobby, setLobby] = useState(initialLobby);
-  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
+  const { lobby, players, live, refresh } = useLobbyLive({
+    code: initialLobby.code,
+    initialLobby,
+  });
   const [copied, setCopied] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [starting, setStarting] = useState(false);
@@ -49,38 +49,9 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
   const alreadyPlayed =
     playerName != null && hasPlayerFinished(lobby.results, playerName);
 
-  const refreshLobby = useCallback(async () => {
-    try {
-      let next = await fetchLobbyByCode(lobby.code);
-      if (!next) return;
-      next = await syncLobbyState(next);
-      setLobby(next);
-    } catch {
-      /* ignore */
-    }
-  }, [lobby.code]);
-
-  const loadPlayers = useCallback(async () => {
-    try {
-      const list = await fetchLobbyPlayers(lobby.id);
-      setPlayers(list);
-    } catch {
-      /* ignore */
-    }
-  }, [lobby.id]);
-
   useEffect(() => {
     setLobbySession({ id: lobby.id, code: lobby.code });
-    loadPlayers();
-    refreshLobby();
-
-    const poll = setInterval(() => {
-      loadPlayers();
-      refreshLobby();
-    }, 2000);
-
-    return () => clearInterval(poll);
-  }, [lobby.id, lobby.code, loadPlayers, refreshLobby]);
+  }, [lobby.id, lobby.code]);
 
   useEffect(() => {
     if (!isPlaying || !lobby.ends_at) {
@@ -94,20 +65,20 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
         Math.floor((new Date(lobby.ends_at!).getTime() - Date.now()) / 1000),
       );
       setSecondsLeft(left);
-      if (left === 0) void refreshLobby();
+      if (left === 0) void refresh();
     }
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [isPlaying, lobby.ends_at, refreshLobby]);
+  }, [isPlaying, lobby.ends_at, refresh]);
 
   async function handleStartGame() {
     if (!playerName || !isHost) return;
     setStarting(true);
     setStartError("");
     try {
-      const next = await startLobby(lobby.id, playerName);
-      setLobby(next);
+      await startLobby(lobby.id, playerName);
+      await refresh();
     } catch (err) {
       setStartError(
         err instanceof Error ? err.message : "Could not start the game.",
@@ -140,12 +111,14 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
       <div className="mx-auto flex min-h-full max-w-lg flex-col px-4 py-10">
         <header className="mb-8 text-center">
           <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
-            Lobby
+            Lobby {live ? "· live" : ""}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {lobby.code}
           </h1>
-          <p className="mt-2 text-sm text-zinc-400">Host: {lobby.host_name}</p>
+          <p className="mt-2 text-sm text-zinc-400">
+            Host: {lobby.host_name} · up to ~80 players
+          </p>
         </header>
 
         <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 text-center">
@@ -155,7 +128,7 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
                 Waiting for host
               </p>
               <p className="mt-2 text-lg text-zinc-200">
-                The host will start the game
+                Join now — host will start the game
               </p>
             </>
           )}
@@ -209,7 +182,7 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
           <h2 className="mb-3 text-sm font-medium text-zinc-300">
             Players ({players.length})
           </h2>
-          <ul className="space-y-2">
+          <ul className="max-h-64 space-y-2 overflow-y-auto">
             {players.map((p) => {
               const done = lobby.results.some(
                 (r) =>
@@ -224,15 +197,15 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
                       : "bg-zinc-900/80 text-zinc-200"
                   }`}
                 >
-                  <span>
+                  <span className="truncate pr-2">
                     {p.player_name}
                     {p.player_name === lobby.host_name && (
                       <span className="ml-2 text-xs text-zinc-500">(host)</span>
                     )}
                   </span>
                   {isPlaying && (
-                    <span className="text-xs text-zinc-500">
-                      {done ? "Done" : "Playing…"}
+                    <span className="shrink-0 text-xs text-zinc-500">
+                      {done ? "Done" : "…"}
                     </span>
                   )}
                 </li>
@@ -255,7 +228,7 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
               <p className="text-center text-sm text-red-400">{startError}</p>
             )}
             <p className="text-center text-xs text-zinc-500">
-              Timer starts when you press Start ({formatTime(300)})
+              Wait for students to join, then start ({formatTime(300)} round)
             </p>
           </div>
         )}
@@ -268,7 +241,7 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
 
         {isPlaying && alreadyPlayed && (
           <p className="mb-8 rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3 text-center text-sm text-zinc-400">
-            You finished your round. Waiting for other players or the timer…
+            You finished your round. Waiting for others or the timer…
           </p>
         )}
 
@@ -285,7 +258,7 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
           <section className="mb-8 flex-1 rounded-xl border border-amber-500/30 bg-zinc-900/50 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-medium">Results</h2>
-              <span className="text-xs text-zinc-500">This session only</span>
+              <span className="text-xs text-zinc-500">Top 10 shown</span>
             </div>
             <LobbyResults
               results={lobby.results}

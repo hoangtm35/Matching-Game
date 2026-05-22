@@ -46,6 +46,22 @@ create table public.lobby_players (
 
 create index lobby_players_lobby_id_idx on public.lobby_players (lobby_id);
 
+create table public.lobby_results (
+  id uuid primary key default gen_random_uuid(),
+  lobby_id uuid not null references public.lobbies (id) on delete cascade,
+  player_name text not null check (char_length(trim(player_name)) between 1 and 30),
+  score int not null check (score >= 0),
+  total_pairs int not null check (total_pairs > 0),
+  time_seconds int not null check (time_seconds >= 0),
+  question_set_title text not null default '',
+  finished_at timestamptz not null default now(),
+  unique (lobby_id, player_name)
+);
+
+create index lobby_results_lobby_id_idx on public.lobby_results (lobby_id);
+create index lobby_results_leaderboard_idx
+  on public.lobby_results (lobby_id, score desc, time_seconds asc);
+
 create table public.scores (
   id uuid primary key default gen_random_uuid(),
   player_name text not null check (char_length(trim(player_name)) between 1 and 30),
@@ -69,6 +85,7 @@ alter table public.options enable row level security;
 alter table public.scores enable row level security;
 alter table public.lobbies enable row level security;
 alter table public.lobby_players enable row level security;
+alter table public.lobby_results enable row level security;
 
 create policy "question_sets_public_read"
   on public.question_sets
@@ -105,6 +122,18 @@ create policy "lobby_players_public_read"
 create policy "lobby_players_public_insert"
   on public.lobby_players for insert to anon, authenticated
   with check (char_length(trim(player_name)) between 1 and 30);
+
+create policy "lobby_results_public_read"
+  on public.lobby_results for select to anon, authenticated using (true);
+
+create policy "lobby_results_public_insert"
+  on public.lobby_results for insert to anon, authenticated
+  with check (
+    char_length(trim(player_name)) between 1 and 30
+    and score >= 0
+    and total_pairs > 0
+    and time_seconds >= 0
+  );
 
 create policy "scores_public_insert"
   on public.scores

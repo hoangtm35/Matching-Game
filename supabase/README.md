@@ -38,9 +38,16 @@ Left sidebar → **Table Editor**. You should see:
 
 Run `004_lobbies.sql` once in SQL Editor. Also run `003_add_time_seconds.sql` first if you have not already.
 
-### 5. Lobby timer + session results (no scores table)
+### 5. Large lobby support (~80 students, one code)
 
-Run `005_lobby_timer_results.sql` — 5-minute lobby timer; results shown once when time ends (stored temporarily on the lobby row, not in `scores`).
+Run **`007_lobby_results_table.sql`** after earlier migrations.
+
+Then in Supabase Dashboard → **Database → Publications** → `supabase_realtime`, ensure these are enabled:
+- `lobbies`
+- `lobby_players`
+- `lobby_results`
+
+Uses one row per student finish (no JSON bottleneck) + live updates.
 
 ### 5. Add game timer column (if project already exists)
 

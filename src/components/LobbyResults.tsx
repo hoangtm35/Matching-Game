@@ -27,7 +27,7 @@ export function LobbyResults({
           row.player_name.toLowerCase() === highlightName.toLowerCase();
         return (
           <li
-            key={`${row.player_name}-${row.finished_at}`}
+            key={row.id ?? `${row.player_name}-${row.finished_at}`}
             className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
               isHighlight
                 ? "bg-sky-500/15 ring-1 ring-sky-500/40"

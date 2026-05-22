@@ -1,7 +1,7 @@
 import { LobbyRoom } from "@/components/LobbyRoom";
 import { normalizeLobbyCode } from "@/lib/game/lobby-code";
 import { tryCreateClient } from "@/lib/supabase/server";
-import type { Lobby, LobbyResult } from "@/types/game";
+import type { Lobby } from "@/types/game";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +9,6 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   params: Promise<{ code: string }>;
 };
-
-function parseResults(raw: unknown): LobbyResult[] {
-  if (!Array.isArray(raw)) return [];
-  return raw as LobbyResult[];
-}
 
 export default async function LobbyPage({ params }: PageProps) {
   const { code: raw } = await params;
@@ -32,15 +27,24 @@ export default async function LobbyPage({ params }: PageProps) {
 
   const { data, error } = await supabase
     .from("lobbies")
-    .select("id, code, host_name, created_at, ends_at, status, results")
+    .select("id, code, host_name, created_at, ends_at, status")
     .eq("code", code)
     .single();
 
   if (error || !data) notFound();
 
+  const { data: results } = await supabase
+    .from("lobby_results")
+    .select(
+      "id, player_name, score, total_pairs, time_seconds, question_set_title, finished_at",
+    )
+    .eq("lobby_id", data.id)
+    .order("score", { ascending: false })
+    .order("time_seconds", { ascending: true });
+
   const lobby: Lobby = {
     ...(data as Lobby),
-    results: parseResults(data.results),
+    results: results ?? [],
   };
 
   return <LobbyRoom initialLobby={lobby} />;
