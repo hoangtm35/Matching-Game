@@ -25,7 +25,7 @@ export default function Home() {
         <section className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-medium">Leaderboard</h2>
-            <span className="text-xs text-zinc-500">Top 10</span>
+            <span className="text-xs text-zinc-500">Top 10 · time</span>
           </div>
           <Leaderboard />
         </section>

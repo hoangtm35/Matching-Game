@@ -19,6 +19,7 @@ export type Score = {
   score: number;
   total_pairs: number;
   question_set_id: string | null;
+  time_seconds: number | null;
   played_at: string;
 };
 

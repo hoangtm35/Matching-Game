@@ -1,6 +1,7 @@
 "use client";
 
 import { MatchOptionRow } from "@/components/MatchOptionRow";
+import { formatTime } from "@/lib/game/format-time";
 import { fetchRandomQuestionSet, submitScore } from "@/lib/game/queries";
 import { getPlayerName } from "@/lib/game/player";
 import type { GameRound, Option } from "@/types/game";
@@ -27,10 +28,18 @@ export function MatchingGame() {
   const [finalScore, setFinalScore] = useState<{
     score: number;
     totalPairs: number;
+    timeSeconds: number;
   } | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [submitError, setSubmitError] = useState("");
   const finishStarted = useRef(false);
+  const startedAtRef = useRef<number | null>(null);
   const timeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const getElapsedSeconds = useCallback(() => {
+    if (!startedAtRef.current) return 0;
+    return Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+  }, []);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
     const id = setTimeout(fn, ms);
@@ -54,6 +63,8 @@ export function MatchingGame() {
     setFinalScore(null);
     setSubmitError("");
     finishStarted.current = false;
+    startedAtRef.current = null;
+    setElapsedSeconds(0);
 
     try {
       const data = await fetchRandomQuestionSet();
@@ -62,17 +73,32 @@ export function MatchingGame() {
         return;
       }
       setRound(data);
+      startedAtRef.current = Date.now();
       setPhase("playing");
     } catch {
       setError("Failed to load questions. Check your connection.");
     }
   }, []);
 
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const tick = () => setElapsedSeconds(getElapsedSeconds());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [phase, getElapsedSeconds]);
+
   const finishRound = useCallback(
-    async (score: number, totalPairs: number, questionSetId: string) => {
+    async (
+      score: number,
+      totalPairs: number,
+      questionSetId: string,
+      timeSeconds: number,
+    ) => {
       if (!playerName || finishStarted.current) return;
       finishStarted.current = true;
-      setFinalScore({ score, totalPairs });
+      setFinalScore({ score, totalPairs, timeSeconds });
       setPhase("submitting");
 
       try {
@@ -81,6 +107,7 @@ export function MatchingGame() {
           score,
           totalPairs,
           questionSetId,
+          timeSeconds,
         });
         setPhase("done");
       } catch {
@@ -112,9 +139,10 @@ export function MatchingGame() {
         correctCount,
         round.optionsA.length,
         round.questionSet.id,
+        getElapsedSeconds(),
       );
     }, FADE_MS);
-  }, [correctCount, round, phase, finishRound, schedule]);
+  }, [correctCount, round, phase, finishRound, schedule, getElapsedSeconds]);
 
   function handleClickA(optionA: Option) {
     if (removedIds.has(optionA.id) || fadingIds.has(optionA.id)) return;
@@ -183,7 +211,8 @@ export function MatchingGame() {
             {finalScore.score}/{finalScore.totalPairs}
           </h1>
           <p className="mt-2 text-zinc-400">
-            {pct}% correct · {round.questionSet.title}
+            {pct}% correct · {formatTime(finalScore.timeSeconds)} ·{" "}
+            {round.questionSet.title}
           </p>
           {submitError ? (
             <p className="mt-4 text-sm text-amber-400">{submitError}</p>
@@ -235,9 +264,12 @@ export function MatchingGame() {
             {round.questionSet.title}
           </h1>
         </div>
-        <p className="font-mono text-sm text-emerald-400">
-          Matched {correctCount}/{totalPairs}
-        </p>
+        <div className="text-right font-mono text-sm">
+          <p className="text-zinc-300">{formatTime(elapsedSeconds)}</p>
+          <p className="text-emerald-400">
+            Matched {correctCount}/{totalPairs}
+          </p>
+        </div>
       </header>
 
       <p className="mb-6 text-center text-sm text-zinc-400">

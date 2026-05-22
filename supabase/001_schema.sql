@@ -29,6 +29,7 @@ create table public.scores (
   score int not null check (score >= 0),
   total_pairs int not null check (total_pairs > 0),
   question_set_id uuid references public.question_sets (id) on delete set null,
+  time_seconds int check (time_seconds is null or time_seconds >= 0),
   played_at timestamptz not null default now()
 );
 

@@ -1,3 +1,4 @@
+import { formatTime } from "@/lib/game/format-time";
 import { tryCreateClient } from "@/lib/supabase/server";
 import type { Score } from "@/types/game";
 
@@ -26,7 +27,9 @@ export async function Leaderboard({
   try {
     const { data, error } = await supabase
       .from("scores")
-      .select("id, player_name, score, total_pairs, question_set_id, played_at")
+      .select(
+        "id, player_name, score, total_pairs, question_set_id, time_seconds, played_at",
+      )
       .order("score", { ascending: false })
       .order("played_at", { ascending: true })
       .limit(10);
@@ -54,22 +57,27 @@ export async function Leaderboard({
           return (
             <li
               key={row.id}
-              className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+              className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ${
                 isHighlight
                   ? "bg-sky-500/15 ring-1 ring-sky-500/40"
                   : "bg-zinc-900/80"
               }`}
             >
-              <span className="flex items-center gap-3">
-                <span className="w-6 text-center font-mono text-zinc-500">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="w-6 shrink-0 text-center font-mono text-zinc-500">
                   {index + 1}
                 </span>
-                <span className="font-medium text-zinc-100">
+                <span className="truncate font-medium text-zinc-100">
                   {row.player_name}
                 </span>
               </span>
-              <span className="font-mono text-emerald-400">
-                {row.score}/{row.total_pairs}
+              <span className="shrink-0 text-right">
+                <span className="font-mono text-emerald-400">
+                  {row.score}/{row.total_pairs}
+                </span>
+                <span className="block font-mono text-xs text-zinc-500">
+                  {formatTime(row.time_seconds)}
+                </span>
               </span>
             </li>
           );

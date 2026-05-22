@@ -43,7 +43,9 @@ export async function fetchLeaderboard(): Promise<Score[]> {
 
   const { data, error } = await supabase
     .from("scores")
-    .select("id, player_name, score, total_pairs, question_set_id, played_at")
+    .select(
+      "id, player_name, score, total_pairs, question_set_id, time_seconds, played_at",
+    )
     .order("score", { ascending: false })
     .order("played_at", { ascending: true })
     .limit(LEADERBOARD_LIMIT);
@@ -57,6 +59,7 @@ export async function submitScore(input: {
   score: number;
   totalPairs: number;
   questionSetId: string;
+  timeSeconds: number;
 }): Promise<Score> {
   const supabase = tryCreateClient();
   if (!supabase) {
@@ -72,8 +75,11 @@ export async function submitScore(input: {
       score: input.score,
       total_pairs: input.totalPairs,
       question_set_id: input.questionSetId,
+      time_seconds: input.timeSeconds,
     })
-    .select("id, player_name, score, total_pairs, question_set_id, played_at")
+    .select(
+      "id, player_name, score, total_pairs, question_set_id, time_seconds, played_at",
+    )
     .single();
 
   if (error) throw error;

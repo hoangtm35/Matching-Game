@@ -34,6 +34,10 @@ Left sidebar → **Table Editor**. You should see:
 2. Copy all of `002_seed.sql`
 3. Paste and **Run**
 
+### 4. Add game timer column (if project already exists)
+
+If you created the database before the timer feature, run `003_add_time_seconds.sql` once in SQL Editor.
+
 ### Verify seed
 
 **Table Editor → `question_sets`** → 3 rows  
