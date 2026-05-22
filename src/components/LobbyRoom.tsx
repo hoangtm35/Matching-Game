@@ -9,6 +9,7 @@ import {
   isLobbyExpired,
   isLobbyPlaying,
   startLobby,
+  terminateLobbyByHost,
 } from "@/lib/game/lobby-queries";
 import { useLobbyLive } from "@/lib/game/use-lobby-live";
 import { formatTime } from "@/lib/game/format-time";
@@ -36,6 +37,7 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState("");
+  const [leaving, setLeaving] = useState(false);
   const playerName = getPlayerName();
   const isHost =
     playerName?.toLowerCase() === lobby.host_name.toLowerCase();
@@ -94,12 +96,26 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function leaveLobby() {
+  async function leaveLobby() {
+    if (leaving) return;
+    setLeaving(true);
+
+    if (isHost && playerName && lobby.status !== "ended") {
+      try {
+        await terminateLobbyByHost(lobby.id, playerName);
+      } catch {
+        /* still navigate away */
+      }
+    }
+
     clearLobbySession();
     router.push("/");
   }
 
   function endedReason(): string {
+    if (lobby.status === "ended" && !everyoneDone && !isLobbyExpired(lobby)) {
+      return "Host left — lobby closed";
+    }
     if (everyoneDone && !isLobbyExpired(lobby)) {
       return "Everyone finished!";
     }
@@ -267,17 +283,31 @@ export function LobbyRoom({ initialLobby }: LobbyRoomProps) {
           </section>
         )}
 
-        <footer className="mt-auto flex justify-center gap-6 pt-8 text-sm">
-          <Link href="/" className="text-zinc-500 hover:text-zinc-300">
-            {isEnded ? "New lobby" : "Home"}
-          </Link>
-          <button
-            type="button"
-            onClick={leaveLobby}
-            className="text-zinc-500 hover:text-zinc-300"
-          >
-            Leave
-          </button>
+        <footer className="mt-auto flex flex-col items-center gap-3 pt-8 text-sm">
+          {isHost && !isEnded && (
+            <p className="text-xs text-amber-400/80">
+              Leaving ends the lobby for all students
+            </p>
+          )}
+          <div className="flex justify-center gap-6">
+            {!isHost || isEnded ? (
+              <Link href="/" className="text-zinc-500 hover:text-zinc-300">
+                {isEnded ? "New lobby" : "Home"}
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void leaveLobby()}
+              disabled={leaving}
+              className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50"
+            >
+              {leaving
+                ? "Leaving…"
+                : isHost && !isEnded
+                  ? "Leave (end lobby)"
+                  : "Leave"}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

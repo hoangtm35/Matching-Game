@@ -236,6 +236,28 @@ export async function endLobby(lobbyId: string): Promise<Lobby> {
   return attachResults(data as LobbyRow);
 }
 
+/** Ends the lobby when the host leaves (terminates the session for everyone). */
+export async function terminateLobbyByHost(
+  lobbyId: string,
+  hostName: string,
+): Promise<void> {
+  const supabase = requireClient();
+  const trimmed = hostName.trim();
+
+  const { data: lobby, error: fetchError } = await supabase
+    .from("lobbies")
+    .select("host_name, status")
+    .eq("id", lobbyId)
+    .single();
+
+  if (fetchError || !lobby) return;
+
+  if (lobby.host_name.toLowerCase() !== trimmed.toLowerCase()) return;
+  if (lobby.status === "ended") return;
+
+  await endLobby(lobbyId);
+}
+
 export async function syncLobbyState(lobby: Lobby): Promise<Lobby> {
   if (lobby.status === "ended") {
     const results = await fetchLobbyResults(lobby.id);
