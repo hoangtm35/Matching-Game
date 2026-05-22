@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "loading" | "playing" | "submitting" | "done";
 
-const FADE_MS = 650;
+const FADE_MS = 900;
 const SHAKE_MS = 450;
 
 export function MatchingGame() {
@@ -34,11 +34,27 @@ export function MatchingGame() {
   const [submitError, setSubmitError] = useState("");
   const finishStarted = useRef(false);
   const startedAtRef = useRef<number | null>(null);
+  /** Frozen when the last correct match is made — fade animation does not add time */
+  const frozenTimeRef = useRef<number | null>(null);
   const timeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const getElapsedSeconds = useCallback(() => {
+    if (frozenTimeRef.current != null) return frozenTimeRef.current;
     if (!startedAtRef.current) return 0;
-    return Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+    return Math.max(
+      0,
+      Math.floor((Date.now() - startedAtRef.current) / 1000),
+    );
+  }, []);
+
+  const freezeTimer = useCallback(() => {
+    if (frozenTimeRef.current != null || !startedAtRef.current) return;
+    const seconds = Math.max(
+      0,
+      Math.floor((Date.now() - startedAtRef.current) / 1000),
+    );
+    frozenTimeRef.current = seconds;
+    setElapsedSeconds(seconds);
   }, []);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
@@ -64,6 +80,7 @@ export function MatchingGame() {
     setSubmitError("");
     finishStarted.current = false;
     startedAtRef.current = null;
+    frozenTimeRef.current = null;
     setElapsedSeconds(0);
 
     try {
@@ -81,9 +98,12 @@ export function MatchingGame() {
   }, []);
 
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || frozenTimeRef.current != null) return;
 
-    const tick = () => setElapsedSeconds(getElapsedSeconds());
+    const tick = () => {
+      if (frozenTimeRef.current != null) return;
+      setElapsedSeconds(getElapsedSeconds());
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -134,12 +154,14 @@ export function MatchingGame() {
     if (!round || phase !== "playing") return;
     if (correctCount < round.optionsA.length) return;
 
+    const timeSeconds = frozenTimeRef.current ?? getElapsedSeconds();
+
     schedule(() => {
       finishRound(
         correctCount,
         round.optionsA.length,
         round.questionSet.id,
-        getElapsedSeconds(),
+        timeSeconds,
       );
     }, FADE_MS);
   }, [correctCount, round, phase, finishRound, schedule, getElapsedSeconds]);
@@ -161,6 +183,9 @@ export function MatchingGame() {
 
     if (optionA.pair_id === optionB.pair_id) {
       const ids = [optionA.id, optionB.id];
+      const isLastPair = correctCount + 1 === round.optionsA.length;
+      if (isLastPair) freezeTimer();
+
       setFadingIds((prev) => new Set([...prev, ...ids]));
 
       schedule(() => {
@@ -299,15 +324,15 @@ export function MatchingGame() {
                     onClick={() => handleClickA(optionA)}
                     disabled={isFading}
                     className={[
-                      "match-option-btn w-full rounded-lg border px-4 py-3 text-left font-medium text-zinc-100",
+                      "match-option-btn w-full rounded-lg px-4 py-3 text-left font-medium text-zinc-100",
                       isFading &&
-                        "match-option-btn--success border-emerald-400 bg-emerald-500/20",
+                        "match-option-btn--success border-emerald-400 bg-emerald-500/25",
                       isWrong &&
-                        "border-red-500/60 bg-red-500/10",
+                        "border-red-400 bg-red-500/15",
                       isSelected
-                        ? "border-sky-500 bg-sky-500/15 ring-2 ring-sky-500/50"
+                        ? "border-sky-400 bg-sky-500/20 ring-2 ring-sky-400/60"
                         : !isFading && !isWrong
-                          ? "border-zinc-700 bg-zinc-900 hover:border-zinc-600"
+                          ? "match-option-btn--default"
                           : "",
                     ]
                       .filter(Boolean)
@@ -342,15 +367,15 @@ export function MatchingGame() {
                     disabled={!canPick || isFading}
                     onClick={() => handleClickB(optionB)}
                     className={[
-                      "match-option-btn w-full rounded-lg border px-4 py-3 text-left font-medium",
+                      "match-option-btn w-full rounded-lg px-4 py-3 text-left font-medium",
                       isFading &&
-                        "match-option-btn--success border-emerald-400 bg-emerald-500/20 text-zinc-100",
+                        "match-option-btn--success border-emerald-400 bg-emerald-500/25 text-zinc-100",
                       isWrong &&
-                        "border-red-500/60 bg-red-500/10 text-zinc-100",
+                        "border-red-400 bg-red-500/15 text-zinc-100",
                       !canPick && !isFading && !isWrong
-                        ? "cursor-default border-zinc-800 bg-zinc-950 text-zinc-600"
+                        ? "match-option-btn--section-b-idle cursor-default"
                         : !isFading && !isWrong
-                          ? "border-zinc-700 bg-zinc-900 text-zinc-100 hover:border-violet-500 hover:bg-violet-500/10"
+                          ? "match-option-btn--default text-zinc-100 hover:border-violet-400 hover:bg-violet-500/15"
                           : "text-zinc-100",
                     ]
                       .filter(Boolean)

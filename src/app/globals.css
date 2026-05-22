@@ -25,37 +25,57 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Correct match: fade + collapse (class toggled after paint in MatchOptionRow) */
+/* Option cards — visible outline on dark background */
+.match-option-btn {
+  border-width: 2px;
+  border-style: solid;
+}
+
+.match-option-btn--default {
+  border-color: rgb(113 113 122); /* zinc-500 */
+  background-color: rgb(24 24 27 / 0.95); /* zinc-900 */
+}
+
+.match-option-btn--default:hover:not(:disabled) {
+  border-color: rgb(161 161 170); /* zinc-400 */
+}
+
+.match-option-btn--section-b-idle {
+  border-color: rgb(82 82 91); /* zinc-600 */
+  background-color: rgb(9 9 11); /* zinc-950 */
+  color: rgb(82 82 91);
+}
+
+/* Correct match: fade the whole card (button box + text) together, then collapse row */
 .match-row {
   overflow: hidden;
   max-height: 120px;
   opacity: 1;
   transform: scale(1);
   transition:
-    opacity 0.55s ease-out,
-    transform 0.55s ease-out,
-    max-height 0.55s ease-out 0.08s,
-    margin 0.55s ease-out 0.08s;
+    opacity 0.75s ease-out,
+    transform 0.75s ease-out,
+    max-height 0.3s ease-out 0.6s,
+    margin 0.3s ease-out 0.6s;
 }
 
 .match-row--fade-out {
   opacity: 0;
-  transform: scale(0.9);
+  transform: scale(0.92);
   max-height: 0 !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   pointer-events: none;
 }
 
+/* Button box fades with the row — do not strip border/padding early */
 .match-row--fade-out .match-option-btn {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  border-width: 0 !important;
-  min-height: 0 !important;
+  transition: opacity 0.75s ease-out, transform 0.75s ease-out, box-shadow 0.75s ease-out;
 }
 
 .match-row--fade-out .match-option-btn--success {
-  box-shadow: 0 0 20px rgba(52, 211, 153, 0.45);
+  border-color: rgb(52 211 153) !important; /* emerald-400 — keep outline while fading */
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.5);
 }
 
 @keyframes match-shake {
