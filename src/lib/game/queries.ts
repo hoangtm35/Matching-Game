@@ -1,10 +1,15 @@
-import { createClient } from "@/lib/supabase/client";
+import { tryCreateClient } from "@/lib/supabase/client";
 import type { GameRound, Option, QuestionSet, Score } from "@/types/game";
 
 const LEADERBOARD_LIMIT = 10;
 
 export async function fetchRandomQuestionSet(): Promise<GameRound | null> {
-  const supabase = createClient();
+  const supabase = tryCreateClient();
+  if (!supabase) {
+    throw new Error(
+      "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+    );
+  }
 
   const { data: sets, error: setsError } = await supabase
     .from("question_sets")
@@ -33,7 +38,8 @@ export async function fetchRandomQuestionSet(): Promise<GameRound | null> {
 }
 
 export async function fetchLeaderboard(): Promise<Score[]> {
-  const supabase = createClient();
+  const supabase = tryCreateClient();
+  if (!supabase) return [];
 
   const { data, error } = await supabase
     .from("scores")
@@ -52,7 +58,12 @@ export async function submitScore(input: {
   totalPairs: number;
   questionSetId: string;
 }): Promise<Score> {
-  const supabase = createClient();
+  const supabase = tryCreateClient();
+  if (!supabase) {
+    throw new Error(
+      "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+    );
+  }
 
   const { data, error } = await supabase
     .from("scores")

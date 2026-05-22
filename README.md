@@ -85,7 +85,12 @@ Do **not** commit `.env.local` — it stays local. Use `.env.local.example` as a
 ## Deploy to Vercel (after GitHub)
 
 1. [vercel.com](https://vercel.com) → **Add New Project** → import your GitHub repo.
-2. Add environment variables (same as `.env.local`):
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Deploy — Vercel will assign a public URL.
+2. **Before or after first deploy** → Project → **Settings** → **Environment Variables**:
+   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase **anon public** key
+   - Enable for **Production**, **Preview**, and **Development**
+3. **Redeploy** (Deployments → ⋯ on latest → **Redeploy**) so env vars apply.
+
+Without these variables the site shows a setup message instead of crashing.
+
+Copy values from Supabase: **Project Settings → API**.
