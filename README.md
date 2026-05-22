@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Matching Game
 
-## Getting Started
+Single-player web game: match items from section A to section B, submit your score, and view the top 10 leaderboard. Built with **Next.js**, **Supabase**, and deployable on **Vercel**.
 
-First, run the development server:
+## Game settings
+
+- Leaderboard: **top 10** scores
+- Questions: **random** from a pool
+- Interaction: **click A**, then **click B**
+
+## Play the game
+
+1. `npm run dev` → [http://localhost:3000](http://localhost:3000)
+2. Enter your name → **Start game**
+3. Click an item in **Section A**, then its match in **Section B**
+4. **Finish** when all pairs are matched — score saves to the top 10 leaderboard
+
+## Step 2 — Database (done)
+
+See **`supabase/README.md`** if you need to re-run SQL.
+
+## Step 1 — Local setup (done)
+
+### 1. Install dependencies
+
+```bash
+cd matching-game
+npm install
+```
+
+### 2. Supabase project
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Open **Project Settings → API**
+3. Copy **Project URL** and **anon public** key
+
+### 3. Environment variables
+
+```bash
+cp .env.local.example .env.local
+```
+
+Edit `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
+
+### 4. Run dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The status card should show:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Env vars missing** — add `.env.local` and restart
+- **Supabase connected** — API works; tables not created yet (normal before Step 2)
+- **Supabase ready** — `scores` table exists (after Step 2)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project structure
 
-## Learn More
+```
+src/
+  app/              # Next.js routes
+  components/       # UI components
+  lib/supabase/     # Supabase client + connection check
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Push to GitHub
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create a new repository on [github.com/new](https://github.com/new) (empty, no README).
+2. In this folder:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```powershell
+cd c:\Work\matching-game
+git remote add origin https://github.com/YOUR_USERNAME/matching-game.git
+git branch -M main
+git push -u origin main
+```
 
-## Deploy on Vercel
+Do **not** commit `.env.local` — it stays local. Use `.env.local.example` as a template.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy to Vercel (after GitHub)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. [vercel.com](https://vercel.com) → **Add New Project** → import your GitHub repo.
+2. Add environment variables (same as `.env.local`):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Deploy — Vercel will assign a public URL.
